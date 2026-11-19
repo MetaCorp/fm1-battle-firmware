@@ -24,6 +24,7 @@
 #ifndef UI_SMALL                 /* (2.7) compiled for size: not the audio path (gfx.c UI_SMALL); the host tests: nothing */
 #define UI_SMALL
 #endif
+#include "battle.h"              /* BATTLE: a battle never writes nor reads the player's song (docs/UPSTREAM.md) */
 #define PROJ_MAGIC 0x46554E36u                 /* "FUN6": format 5 + the 2.6 parameters, nudge and condition in a byte */
 #define PROJ_MAGIC_V5 0x46554E35u              /* "FUN5": format 4 + per-step nudge, parameter locks, fill conditions (SLOOP 2.4) */
 #define PROJ_MAGIC_V4 0x46554E34u              /* "FUN4": four tracks, P_COUNT parameters each, 10-byte steps; read only */
@@ -572,7 +573,7 @@ UI_SMALL static void *up_stage(void) { return &proj_tmp; }   /* upreset.c: a use
 UI_SMALL static void proj_fetch(uint32_t slot)
 {
     project_t *q = &proj_slot[slot & 3u];
-    int n = st_load(OBJ_PROJECT0 + (slot & 3u), &proj_tmp, sizeof proj_tmp);
+    int n = battle_holds_flash() ? -1 : st_load(OBJ_PROJECT0 + (slot & 3u), &proj_tmp, sizeof proj_tmp);   /* BATTLE */
     if (!proj_import(q, &proj_tmp, n))
         q->magic = 0;
 }
@@ -588,7 +589,7 @@ UI_SMALL static void project_save(uint32_t slot)
 #endif
     proj_capture(p);
 #if FELUCCA_FLASH
-    if (flash_ok) {
+    if (flash_ok && !battle_holds_flash()) {            /* BATTLE: the battle's sections stay in RAM */
         if (st_save(OBJ_PROJECT0 + (slot & 3u), p, sizeof *p))
             ui_message("SAVE ERROR");
         else
@@ -614,7 +615,7 @@ UI_SMALL static void project_erase(uint32_t slot)
         return;
     }
 #if FELUCCA_FLASH
-    if (flash_ok && st_save(OBJ_PROJECT0 + slot, &proj_slot[slot], 0)) {
+    if (flash_ok && !battle_holds_flash() && st_save(OBJ_PROJECT0 + slot, &proj_slot[slot], 0)) {   /* BATTLE */
         ui_message("ERASE ERROR");
         return;
     }
@@ -712,7 +713,7 @@ UI_SMALL static void autosave_tick(void)                /* main loop */
 {
 #if FELUCCA_FLASH
     uint32_t h, now = fm1_ms;
-    if (!flash_ok || song.playing || transport_req || rec_wait || ft_on || ui.menu ||
+    if (!flash_ok || battle_holds_flash() || song.playing || transport_req || rec_wait || ft_on || ui.menu ||   /* BATTLE */
         now - ui_input_ms < AUTOSAVE_IDLE || now - autosave_ms < AUTOSAVE_GAP || now - autosave_checked < 1000u)
         return;
     autosave_checked = now;
@@ -844,6 +845,7 @@ UI_SMALL static void persist_boot(void)                    /* before settings_in
                 panel = old;
         }
     }
+    battle_load_record();                          /* BATTLE: before the slots (a battle's are its own) */
     {   /* projects: fill empty RAM slots from flash, so the slot list is right after power-on. A slot
          * still valid in RAM (a warm reset: an update, UPDATE MODE, a crash) may never have reached
          * flash (a live section stored while playing): marked to be written when quiet */
@@ -1008,6 +1010,8 @@ UI_SMALL static void settings_save(void)
     persist_t p;
     if (!flash_ok)
         return;
+    if (battle_holds_flash())                           /* BATTLE: the settings hold the player's song order */
+        return;                                         /* (battle.c bt_player_back saves them if they changed) */
     persist_fill(&p);
     {
         uint8_t mp[MIDI_PART];
@@ -1138,6 +1142,8 @@ UI_SMALL static void section_load(uint32_t s)                    /* stopped: the
 UI_SMALL static void sections_write(void)                        /* the dirty sections and song into flash */
 {
     uint32_t i;
+    if (battle_holds_flash())                           /* BATTLE: the battle's sections stay in RAM */
+        return;
 #if FELUCCA_FLASH
     if (flash_ok)
         for (i = 0; i < 4u; i++)
@@ -1158,7 +1164,7 @@ UI_SMALL static void persist_flush_now(void)
 {
     sections_write();
 #if FELUCCA_FLASH
-    if (flash_ok && !arrangement_clock.running) {     /* (a song playing: the tracks hold a section) */
+    if (flash_ok && !battle_holds_flash() && !arrangement_clock.running) {     /* (a song playing: the tracks hold a section; BATTLE) */
         proj_capture(&autosave_buf);
         if (autosave_buf.sum != autosave_hash && st_save(OBJ_AUTOSAVE, &autosave_buf, sizeof autosave_buf) == 0)
             autosave_hash = autosave_buf.sum;

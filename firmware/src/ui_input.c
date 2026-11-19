@@ -1110,6 +1110,8 @@ UI_SMALL static void ui_input(void)
     enc_hold = 0;                                       /* (panel.c: every knob readable again this pass) */
     if (pressed || notes)
         ui_input_ms = fm1_ms;
+    if (battle_input(pressed, notes))                   /* BATTLE: a battle screen has the panel */
+        return;
     remote_poll();                                      /* (2.7) the buttons over MIDI */
     pc_poll();                                          /* MIDI Program Change: a sound (2.6, ui.c) */
     midi_chan_fix();                                    /* GLO > MIDI: no channel on two tracks (2.6, ui.c) */
@@ -1229,6 +1231,7 @@ UI_SMALL static void ui_input(void)
         b = panel_btn_of(id);
         switch (b) {
         case B_PLAY:
+            battle_play_down();                         /* BATTLE: held 2 s, the submit screen */
 #if FELUCCA_ARRANGER
             if (!song.playing && arrangement_enabled && !arr_valid(&arrangement, arrangement_ready())) {
                 ui_message("EMPTY SECTION: REC");

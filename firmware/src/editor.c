@@ -35,6 +35,7 @@ enum { ED_INFO = 1, ED_GET, ED_SET, ED_DUMP, ED_DESC, ED_STEP_GET, ED_STEP_SET, 
 /* v11 (SLOOP 2.7): backup object 11 = your theme (gfx.c theme_t), the editor's Theme page */
 /* v12 (SLOOP 2.7): LIVE = 77, editor_live.c: the LIVE page (transport, sections, mix keys, punch-in FX, REC, undo) */
 #define ED_PROTO 12u                                   /* the protocol version INFO ends with */
+#include "battle.h"                                    /* BATTLE: FM-1 Battle's commands 100.. (docs/UPSTREAM.md) */
 
 static uint8_t ed_out[600];
 static uint32_t ed_n;
@@ -669,6 +670,10 @@ UI_SMALL static int ed_backup(uint32_t cmd, const uint8_t *a, uint32_t na)   /* 
 #include "editor_dsyn.c"                              /* v10: the SYN drum kits (72..76) */
 
 #include "editor_live.c"                              /* v12: the LIVE page (77) */
+#ifdef BATTLE_MODE
+#include "battle.c"                                    /* BATTLE: the battle mode (100..111) */
+#include "battle_ui.c"
+#endif
 
 UI_SMALL static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0 and F7 */
 {
@@ -678,6 +683,10 @@ UI_SMALL static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes b
     int16_t *vp;
     const param_desc_t *d;
     ed_begin(cmd);
+    if (battle_editor(cmd, a, na)) {                       /* BATTLE: its commands; the writes refused in a battle */
+        ed_send();
+        return;
+    }
     if (ed_backup(cmd, a, na)) {                           /* v6: backup / restore */
         ed_send();
         return;
@@ -707,6 +716,7 @@ UI_SMALL static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes b
             ed_str(ENGINES[i]->name, 8);
         ed_b(NTRK);                                       /* v3 */
         ed_b(ED_PROTO);                                   /* v5..: the protocol version (9: FM6 patches, 10: SYN kits) */
+        battle_info_tag();                                /* BATTLE: "BATTLE", its protocol version */
         break;
     case ED_GET:
     case ED_SET:

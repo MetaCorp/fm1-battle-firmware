@@ -228,6 +228,7 @@ UI_SMALL static void fm1_main(void)
     fm1_adc_init();
     panel_init();
     felucca_init();
+    battle_boot();                                      /* BATTLE: a battle that was on goes on */
     cpu1_boot();                                        /* the second core: at power-on, before the audio and the
                                                          * timers (X0X: started later it never reaches its entry);
                                                          * if it does not answer, SLOOP runs on one core (cpu1.c) */
@@ -282,6 +283,8 @@ UI_SMALL static void fm1_main(void)
                 }
                 song.master_q12 = (k10 * k10) >> 8;            /* 0 .. ~4096 */
             }
+            if (battle_muted())                                /* BATTLE: the waiting room is silent */
+                song.master_q12 = 0;
         }
         {   /* OCT- + OCT+ held 5 s, stopped: enter UBOOT with RAM intact (debug / update); a countdown
              * shows from 2 s, letting go cancels it. Not while playing: on the drum track these are the
@@ -315,6 +318,7 @@ UI_SMALL static void fm1_main(void)
         }
 #if FELUCCA_OTA
         ed_service();                                   /* web editor SysEx */
+        battle_poll();                                  /* BATTLE: the clock, the pushes, the locks */
         ota_service();                                  /* M-UPGRADE handshake */
         if (usb.ota_req) {                              /* M-UPGRADE upgrade command */
             usb.ota_req = 0;

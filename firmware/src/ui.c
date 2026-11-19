@@ -2,6 +2,7 @@
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
 /* Felucca user interface. Four columns map to KNOB 1..4. Rendering is lazy:
  * every element remembers what it last drew and is redrawn only on change. */
+#include "battle.h"                 /* BATTLE: the battle mode's hooks (docs/UPSTREAM.md) */
 #ifndef FELUCCA_VERSION
 #define FELUCCA_VERSION "SLOOP 2.8.5"  /* the beat machine firmware for the FM-1 (based on Felucca) */
 #endif
@@ -702,6 +703,10 @@ UI_SMALL static void select_engine(uint32_t e)
 {
     if (is_drum(TSEL))
         return;
+    if (!battle_engine_ok(e)) {                      /* BATTLE: the pack's engines only */
+        ui_message("PACK SOUNDS ONLY");
+        return;
+    }
     set_engine(e);
     ui_say("ENGINE ", ENGINES[TSEL->eng_req]->name);
     ui.force = 1;
@@ -856,7 +861,7 @@ UI_SMALL static int fav_has(uint32_t key)
 UI_SMALL static void fav_toggle(int add)                      /* KNOB 4 on the PRESETS page: right adds, left removes */
 {
     uint32_t key = fav_key(), i;
-    if (key == FAV_NONE || is_drum(TSEL))
+    if (key == FAV_NONE || is_drum(TSEL) || battle_locked())   /* BATTLE: the favourites are the player's */
         return;
     if (add) {
         if (fav_has(key)) {
@@ -915,6 +920,8 @@ UI_SMALL static void side_take(side_rec_t *r)                /* a side record re
 /* the PRESETS list: the favourites, then every factory sound by kind, then the user presets */
 UI_SMALL static uint32_t preset_pos(uint32_t *total)
 {
+    if (battle_list())                               /* BATTLE: the pack's sounds only */
+        return battle_preset_pos(total);
     uint32_t b[FAV_N], nf = fav_list(b), cur = base_pos(total);
     *total += nf;
     if (fav_at >= 0 && (uint32_t)fav_at < nf && b[fav_at] == cur)
@@ -923,11 +930,15 @@ UI_SMALL static uint32_t preset_pos(uint32_t *total)
 }
 UI_SMALL static uint32_t preset_at(uint32_t n, uint32_t *k)
 {
+    if (battle_list())                               /* BATTLE */
+        return battle_preset_at(n, k);
     uint32_t b[FAV_N], nf = fav_list(b);
     return base_at(n < nf ? b[n] : n - nf, k);
 }
 UI_SMALL static const char *preset_kind(uint32_t n)
 {
+    if (battle_list())                               /* BATTLE */
+        return "PACK";
     uint32_t b[FAV_N], nf = fav_list(b);
     return n < nf ? "FAV" : base_kind(n - nf);
 }
@@ -970,6 +981,8 @@ UI_SMALL static void pc_poll(void)
         if (!r)
             continue;
         pc_req[i] = 0;
+        if (battle_locked())                         /* BATTLE: no Program Change during a battle */
+            continue;
         n = r - 1u;
         if (is_drum(&trk[i])) {
             if (n >= DRUM_KITS)

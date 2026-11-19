@@ -13,6 +13,7 @@
 #include "fm1_lcd_hw.h"
 #include "fm1_cpu1.h"      /* the second core (X0X): started in main.c, used by the render later */
 #include "felucca_tables.h"
+#define BATTLE_MODE 1      /* BATTLE: FM-1 Battle's mode (battle.h, battle.c, battle_ui.c; docs/UPSTREAM.md) */
 
 #include "libc.c"
 #include "lcd.c"
@@ -76,6 +77,8 @@
 #error "FELUCCA_OTA needs FELUCCA_FLASH"
 #endif
 #if FELUCCA_FLASH
+/* BATTLE: the RAM driver may also write the battle sector 0xFB000..0xFBFFF (fm1_flash.h leaves it free; battle.c) */
+#define FL_RANGE_OK(off, n) (FL_STORE_OK(off, n) || FL_IN(off, n, FL_OTA_LO, FL_OTA_HI) || FL_IN(off, n, 0x000FB000u, 0x000FC000u))
 #include "fm1_flash.h"
 static uint8_t flash_ok;                 /* JEDEC id matched at boot (persist_boot) */
 static int st_read(uint32_t off, void *dst, uint32_t n)   /* 256-byte IRQ-off windows: audio keeps up */
