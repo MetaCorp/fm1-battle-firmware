@@ -328,7 +328,11 @@ static void t_timeup_abort(void)
     press(B_REC);
     CHECK(arm(600, 0, 100) == BT_OK && setup(100, PACK, KIT, &crc) == BT_OK && commit(crc) == BT_OK && start(0) == BT_OK,
           "a third battle");
-    CHECK(abort_() == BT_OK && bt.state == BT_IDLE, "ABORT while running");
+    f_begin(107);
+    CHECK(rc_of(107) == BT_OK && bt.state == BT_SUBMITTED, "SUBMIT from the site");
+    f_begin(107);
+    CHECK(rc_of(107) == BT_OK, "SUBMIT again: still submitted");
+    CHECK(abort_() == BT_OK && bt.state == BT_IDLE, "ABORT once submitted");
     player_check("after ABORT");
     /* REC + PLAY held on the waiting screen: the player leaves */
     CHECK(arm(600, 0, 100) == BT_OK, "armed again");

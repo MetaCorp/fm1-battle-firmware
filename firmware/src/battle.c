@@ -593,6 +593,12 @@ UI_SMALL static void bt_cmd(uint32_t cmd, const uint8_t *a, uint32_t na)
             rc = BT_EFLASH;
         break;
     }
+    case BT_CMD_SUBMIT:                          /* from the site (its Submit button, D9): as PLAY held + PLAY */
+        if (bt.state == BT_RUNNING)
+            bt_submit(0);
+        else if (bt.state != BT_SUBMITTED)
+            rc = BT_ESTATE;
+        break;
     case BT_CMD_ACK:                             /* result: 0 received, 1 refused */
         if (na < 1u)
             rc = BT_EARGS;

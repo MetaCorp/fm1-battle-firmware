@@ -52,6 +52,7 @@ Every reply starts with `rc` then the state, unless said otherwise. rc: 0 ok, 1 
 | 105 | BT_START | offset ms (u35), token (pack7, ≤ 96 bytes) | rc, state | READY → RUNNING, the clock at `offset`. Again while running with the same token: the clock resynced (rc 6 for another token). The token is the server's, kept, not checked here |
 | 106 | BT_STATE | — | state, flags, elapsed ms (u35), left ms (u35) | Also **pushed** every second while RUNNING or SUBMITTED |
 | 107 | BT_SUBMIT | (push) | battle id (pack7 16), elapsed ms (u35), flags | Pushed every second while SUBMITTED; the site then reads the song (`BK_LIST`, `BK_GET` 0, 1, 2..5) |
+| 107 | BT_SUBMIT | — (request, the site's Submit button) | rc, state | RUNNING → SUBMITTED, as PLAY held + PLAY; again while SUBMITTED: rc 0 |
 | 108 | BT_ACK | result (0 received, 1 refused) | rc, state | SUBMITTED → DONE, the player's song back |
 | 109 | BT_RESULT | rank (0: not ranked), players, score × 100 (v14), winner (str) | rc, state | Not during a battle. → DONE with the result on screen |
 | 110 | BT_ABORT | — | rc, state | Anywhere → IDLE, the player's song back |
