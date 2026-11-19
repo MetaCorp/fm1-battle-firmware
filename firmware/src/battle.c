@@ -452,7 +452,7 @@ UI_SMALL static void bt_cmd(uint32_t cmd, const uint8_t *a, uint32_t na)
         bt_u35(bt.duration_ms / 1000u);
         ed_v(bt.bpm);
         ed_str(BT_FW_NAME " " BT_FW_VERSION, 24);
-        ed_str("SLOOP " FELUCCA_VERSION, 24);
+        ed_str(FELUCCA_VERSION, 24);              /* "SLOOP 2.8.5" */
         return;
     case BT_CMD_STATE:
         bt_state_out();
