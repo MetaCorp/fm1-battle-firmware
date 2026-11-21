@@ -7,13 +7,12 @@
  * IN: "FBSG", u8 count, then per object: u8 id (0 the loop, 2..5 the sections A..D), u32 LE length, the bytes as
  * BK_GET read them; then the 36 bytes of the song order (settings bytes 48..83).
  * Prints one JSON line: {"ok":true,"mode":"song"|"loop","ms":N,"peak":P} or {"ok":false,"reason":"..."}.
- * Length (D21): an arranged song played once, else the loop repeated up to at least 30 s; always 30 s .. 3 min, with
- * a 3 s fade when it is cut. */
+ * Length (D21): an arranged song played once (at least 30 s), else the loop played twice (Léopold, 22 nov. 2026); at
+ * most 3 min, with a 3 s fade when it is cut. */
 #include "../tests/editor_host.c"
 
 #define MAX_MS 180000u
 #define MIN_MS 30000u
-#define LOOP_MS 30000u                          /* (60 s until Léopold, 21 nov. 2026) */
 #define FADE_MS 3000u
 
 static int fail(const char *why)
@@ -112,9 +111,15 @@ int main(int argc, char **argv)
         events_block(CTL);
         song.master_q12 = 4096;
         arrangement_enabled = 1;
-    } else {                                              /* the loop, in whole bars, up to at least 30 s */
-        uint32_t bar = 4u * 60u * FS / (uint32_t)(song.g[G_BPM] > 0 ? song.g[G_BPM] : 120);
-        total = (FS * (LOOP_MS / 1000u) + bar - 1u) / bar * bar;
+    } else {                                              /* the loop, played twice (Léopold, 22 nov. 2026) */
+        uint64_t units = 0;                               /* its length: its longest track, LEN x DIV (clock units) */
+        uint32_t bpm = (uint32_t)(song.g[G_BPM] > 0 ? song.g[G_BPM] : 120);
+        for (i = 0; i < NTRK; i++) {
+            uint64_t u = (uint64_t)clamp(trk[i].p[P_SLEN], 1, NSTEP) * div_units((uint32_t)trk[i].p[P_SDIV] % NDIV_STEP);
+            if (u > units) units = u;
+        }
+        total = (uint32_t)(2u * units / bpm);             /* (div_samples: units / BPM, in samples) */
+        if (total < CTL) total = CTL;
         arrangement_enabled = 0;
     }
     if (total > FS * (MAX_MS / 1000u)) total = FS * (MAX_MS / 1000u);
