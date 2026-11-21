@@ -7,7 +7,7 @@
  * IN: "FBSG", u8 count, then per object: u8 id (0 the loop, 2..5 the sections A..D), u32 LE length, the bytes as
  * BK_GET read them; then the 36 bytes of the song order (settings bytes 48..83).
  * Prints one JSON line: {"ok":true,"mode":"song"|"loop","ms":N,"peak":P} or {"ok":false,"reason":"..."}.
- * Length (D21): an arranged song played once (at least 30 s), else the loop played twice (Léopold, 22 nov. 2026); at
+ * Length (D21): an arranged song played once (at least 30 s), else the loop played twice, 64 steps at least (Léopold, 22 nov. 2026); at
  * most 3 min, with a 3 s fade when it is cut. */
 #include "../tests/editor_host.c"
 
@@ -111,14 +111,20 @@ int main(int argc, char **argv)
         events_block(CTL);
         song.master_q12 = 4096;
         arrangement_enabled = 1;
-    } else {                                              /* the loop, played twice (Léopold, 22 nov. 2026) */
+    } else {                                /* the loop, twice and 64 steps at least (Léopold, 22 nov. 2026) */
         uint64_t units = 0;                               /* its length: its longest track, LEN x DIV (clock units) */
-        uint32_t bpm = (uint32_t)(song.g[G_BPM] > 0 ? song.g[G_BPM] : 120);
+        uint32_t bpm = (uint32_t)(song.g[G_BPM] > 0 ? song.g[G_BPM] : 120), steps = 1, passes;
         for (i = 0; i < NTRK; i++) {
-            uint64_t u = (uint64_t)clamp(trk[i].p[P_SLEN], 1, NSTEP) * div_units((uint32_t)trk[i].p[P_SDIV] % NDIV_STEP);
-            if (u > units) units = u;
+            uint32_t len = (uint32_t)clamp(trk[i].p[P_SLEN], 1, NSTEP);
+            uint64_t u = (uint64_t)len * div_units((uint32_t)trk[i].p[P_SDIV] % NDIV_STEP);
+            if (u > units) {
+                units = u;
+                steps = len;
+            }
         }
-        total = (uint32_t)(2u * units / bpm);             /* (div_samples: units / BPM, in samples) */
+        passes = (NSTEP + steps - 1u) / steps;            /* 64 steps of the longest track at least: 16 steps, 4 passes */
+        if (passes < 2u) passes = 2u;
+        total = (uint32_t)(passes * units / bpm);         /* (div_samples: units / BPM, in samples) */
         if (total < CTL) total = CTL;
         arrangement_enabled = 0;
     }
