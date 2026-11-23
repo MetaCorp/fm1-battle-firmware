@@ -7,7 +7,7 @@
  * IN: "FBSG", u8 count, then per object: u8 id (0 the loop, 2..5 the sections A..D), u32 LE length, the bytes as
  * BK_GET read them; then the 36 bytes of the song order (settings bytes 48..83).
  * Prints one JSON line: {"ok":true,"mode":"song"|"loop","ms":N,"peak":P} or {"ok":false,"reason":"..."}.
- * Length (D21): an arranged song played once (at least 30 s), else the loop played twice, 64 steps at least (Léopold, 22 nov. 2026); at
+ * Length (D21): an arranged song played once (at least 30 s), else the loop played twice, 64 steps and 30 s at least, in whole passes (Léopold); at
  * most 3 min, with a 3 s fade when it is cut. */
 #include "../tests/editor_host.c"
 
@@ -124,6 +124,8 @@ int main(int argc, char **argv)
         }
         passes = (NSTEP + steps - 1u) / steps;            /* 64 steps of the longest track at least: 16 steps, 4 passes */
         if (passes < 2u) passes = 2u;
+        if (units / bpm)                                  /* and 30 s at least, in whole passes (Léopold, 24 nov. 2026) */
+            while ((uint64_t)passes * units / bpm < (uint64_t)FS * (MIN_MS / 1000u)) passes++;
         total = (uint32_t)(passes * units / bpm);         /* (div_samples: units / BPM, in samples) */
         if (total < CTL) total = CTL;
         arrangement_enabled = 0;
