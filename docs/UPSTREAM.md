@@ -16,6 +16,7 @@ Base: SLOOP 2.8.5 (`v2.8.5`, bac9c05).
 | `firmware/src/ui.c` | `fav_toggle`, `pc_poll`, `select_engine` | no favourites, no Program Change, the pack's engines only |
 | `firmware/src/ui_input.c` | `battle_input()` at the top of `ui_input`; `battle_play_down()` in `B_PLAY` | the battle screens take the panel; PLAY held 2 s |
 | `firmware/src/ui_draw.c` | `battle_draw()` at the top of `ui_draw`; `battle_head_sig()`, `battle_head()` in `draw_head` | the screens; the clock in the top bar |
+| `firmware/src/ui_studio.c` | `battle_head_sig()`, `battle_head_r()` in `te_header`; `solo` and `click` start left of the clock | the clock in the live screens' header (TRACKS, drums, REC), bottom right under the title |
 | `firmware/src/project.c` | `#include "battle.h"`; `proj_fetch`, `project_save`, `project_erase`, `autosave_tick`, `sections_write`, `persist_flush_now`, `settings_save` | the player's song is neither written nor read during a battle |
 | `firmware/src/project.c` | `battle_load_record()` in `persist_boot` | the record known before the slots are filled |
 | `firmware/src/main.c` | `battle_boot()` after `felucca_init`; `battle_poll()` after `ed_service`; `song.master_q12 = 0` while `battle_muted()` | the battle after a reset; the clock and pushes; the silent waiting room |

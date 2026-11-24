@@ -71,6 +71,149 @@ UI_SMALL static void bt_line(uint32_t y, const felucca_font_t *f, const char *s,
     draw_text_box(0, y, 240, f, s, c, 1);
 }
 
+/* the lobby and the countdown are drawn whole, in two strips of 120 rows (cv_oy: the same absolute coordinates in
+ * both), so a redraw never flickers */
+UI_SMALL static void bt_c(int32_t y, const felucca_font_t *f, const char *s, uint16_t c)   /* centred */
+{
+    cv_text(120 - text_w(f, s) / 2, y, f, s, c);
+}
+
+UI_SMALL static void bt_fit(char *d, const char *s, uint32_t n, int32_t w)   /* s cut to w px, with ".." */
+{
+    uint32_t k;
+    str_cpy(d, s, n);
+    if (text_w(&FONT_S, d) <= w)
+        return;
+    for (k = str_len(d); k > 0u; k--) {
+        d[k - 1u] = 0;
+        if (k + 1u < n && text_w(&FONT_S, d) + text_w(&FONT_S, "..") <= w) {
+            str_cpy(d + str_len(d), "..", n - str_len(d));
+            return;
+        }
+    }
+}
+
+/* the waiting room's band: the battle's tempo as the TRACKS header shows it, its name and length on the right */
+UI_SMALL static void bt_band(void)
+{
+    char b[16];
+    uint32_t m = bt.duration_ms / 60000u, s = bt.duration_ms / 1000u % 60u;
+    fmt_int(b, bt.bpm);
+    cv_text(4, 4, &FONT_L, b, TE_G4);
+    cv_text(4 + text_w(&FONT_L, b) + 4, 20, &FONT_S, "bpm", TE_G3);
+    cv_text(236 - text_w(&FONT_S, "fm-1 battle"), 5, &FONT_S, "fm-1 battle", TE_COL[3]);
+    if (s) {
+        bt_mmss(b, bt.duration_ms);
+    } else {
+        fmt_int(b, (int32_t)m);
+        str_cpy(b + str_len(b), " min", sizeof b - str_len(b));
+    }
+    cv_text(236 - text_w(&FONT_S, b), 22, &FONT_S, b, TE_G3);
+    cv_rect(0, 39, 240, 1, TE_G1);
+}
+
+/* the players, one tile each (8 at most), the ready ones lit */
+UI_SMALL static void bt_tiles(int32_t y)
+{
+    uint32_t n = btr.lobby_n > 8u ? 8u : btr.lobby_n, r = btr.lobby_ready > n ? n : btr.lobby_ready, i;
+    int32_t x = 120 - ((int32_t)n * 26 - 6) / 2;
+    for (i = 0; i < n; i++, x += 26) {
+        cv_rect(x, y, 20, 24, i < r ? TE_COL[1] : TE_G2);
+        if (i >= r)
+            cv_rect(x + 2, y + 2, 16, 20, C_BLACK);
+    }
+}
+
+UI_SMALL static void bt_foot(void)
+{
+    bt_c(222, &FONT_S, btr.quitting ? "hold to leave..." : "rec+play held: leave", btr.quitting ? TE_RED : TE_G3);
+}
+
+UI_SMALL static uint32_t bt_cd_left(void)       /* ms left in the countdown, 0 none or over */
+{
+    return btr.cd_end && (int32_t)(btr.cd_end - fm1_ms) > 0 ? btr.cd_end - fm1_ms : 0u;
+}
+
+/* armed (press READY on the site), then ready (waiting for the others) */
+UI_SMALL static void bt_lobby(void)
+{
+    char b[28];
+    uint32_t ready = bt.state == BT_READY, more = btr.lobby_n > btr.lobby_ready ? btr.lobby_n - btr.lobby_ready : 0u;
+    bt_band();
+    bt_fit(b, btr.title[0] ? btr.title : "battle lobby", sizeof b, 232);
+    bt_c(54, &FONT_S, b, C_WHITE);
+    bt_c(72, &FONT_S, btr.genre[0] ? btr.genre : "any style", TE_G4);
+    if (ready) {
+        bt_c(100, &FONT_L, "READY", TE_COL[1]);
+        if (!btr.lobby_n || !more) {
+            str_cpy(b, btr.lobby_n ? "everyone is ready" : "waiting for the others", sizeof b);
+        } else {
+            str_cpy(b, "waiting for ", sizeof b);
+            fmt_int(b + str_len(b), (int32_t)more);
+            str_cpy(b + str_len(b), more == 1u ? " player" : " players", sizeof b - str_len(b));
+        }
+        bt_c(136, &FONT_S, b, TE_G4);
+    } else {
+        bt_c(100, &FONT_L, "PRESS READY", C_WHITE);
+        bt_c(136, &FONT_S, "on the site", TE_G4);
+    }
+    if (btr.lobby_n) {
+        bt_tiles(162);
+        fmt_int(b, btr.lobby_ready);
+        str_cpy(b + str_len(b), " / ", sizeof b - str_len(b));
+        fmt_int(b + str_len(b), btr.lobby_n);
+        str_cpy(b + str_len(b), " ready", sizeof b - str_len(b));
+        bt_c(192, &FONT_S, b, TE_G3);
+    } else {
+        bt_c(178, &FONT_S, "silent until the start", TE_G3);
+    }
+    bt_foot();
+}
+
+/* the countdown: the seconds in big digits, a bar that empties, red for the last three */
+UI_SMALL static void bt_countdown(void)
+{
+    char b[28];
+    uint32_t ms = bt_cd_left(), sec = (ms + 999u) / 1000u, len = btr.cd_s ? btr.cd_s * 1000u : 15000u, nd, i, w;
+    uint16_t c = sec <= 3u ? TE_RED : C_WHITE;
+    int32_t x;
+    bt_band();
+    bt_c(52, &FONT_S, sec ? "starts in" : "starting...", TE_G4);
+    if (sec > 999u) sec = 999u;
+    nd = sec >= 100u ? 3u : sec >= 10u ? 2u : 1u;
+    x = 120 - ((int32_t)nd * 56 - 12) / 2;
+    for (i = nd; i-- > 0u; x += 56) {
+        uint32_t d = i == 2u ? sec / 100u : i == 1u ? sec / 10u % 10u : sec % 10u;
+        te_digit(x, 76, 44, 76, 9, d, c);
+    }
+    w = ms >= len ? 200u : ms * 200u / len;
+    cv_rect(20, 166, 200, 6, TE_G1);
+    cv_rect(20, 166, (int32_t)w, 6, sec <= 3u ? TE_RED : TE_COL[1]);
+    if (bt.state != BT_READY) {
+        bt_c(186, &FONT_S, "press ready on the site", TE_RED);
+    } else {
+        bt_fit(b, btr.title[0] ? btr.title : "battle", sizeof b, 232);
+        bt_c(184, &FONT_S, b, TE_G4);
+        fmt_int(b, btr.lobby_n);
+        str_cpy(b + str_len(b), btr.lobby_n == 1u ? " player" : " players", sizeof b - str_len(b));
+        bt_c(200, &FONT_S, b, TE_G3);
+    }
+    bt_foot();
+}
+
+UI_SMALL static void bt_paint(void (*fn)(void))
+{
+    int32_t oy = cv_oy;
+    uint32_t y;
+    for (y = 0; y < 240u; y += 120u) {
+        cv_begin(240, 120, C_BLACK);
+        cv_oy = -(int32_t)y;
+        fn();
+        cv_oy = oy;
+        cv_blit(0, y);
+    }
+}
+
 UI_SMALL static int battle_draw(void)
 {
     uint32_t scr = bt_screen(), sig, left = bt_left();
@@ -84,7 +227,7 @@ UI_SMALL static int battle_draw(void)
         return 0;
     }
     sig = scr * 1000003u + bt.state * 7919u + btr.lobby_n * 131u + btr.lobby_ready * 17u + usb.config * 3u +
-          (btr.cd_end ? (btr.cd_end - fm1_ms + 999u) / 1000u * 65537u : 0u) + str_hash(5u, btr.title) +
+          (btr.cd_end ? (bt_cd_left() + 124u) / 125u * 65537u + 1u : 0u) + str_hash(5u, btr.title) +
           (left + 999u) / 1000u * 97u + btr.quitting * 1777u;
     if (scr == btr.scr && sig == btr.scr_sig && !ui.force)
         return 1;
@@ -95,26 +238,7 @@ UI_SMALL static int battle_draw(void)
     ui.force = 0;
     switch (scr) {
     case BS_WAIT:
-        bt_line(10, &FONT_S, "FM-1 BATTLE", TE_COL[3]);
-        bt_line(40, &FONT_S, btr.title[0] ? btr.title : "BATTLE LOBBY", C_WHITE);
-        str_cpy(b, btr.genre[0] ? btr.genre : "ANY STYLE", sizeof b);
-        str_cpy(b + str_len(b), "  ", sizeof b - str_len(b));
-        fmt_int(b + str_len(b), bt.bpm);
-        str_cpy(b + str_len(b), " BPM", sizeof b - str_len(b));
-        bt_line(62, &FONT_S, b, C_GRAY);
-        if (btr.cd_end && (int32_t)(btr.cd_end - fm1_ms) > 0) {
-            bt_mmss(b, btr.cd_end - fm1_ms);
-            bt_line(96, &FONT_L, b, C_WHITE);
-        } else {
-            bt_line(96, &FONT_L, bt.state == BT_READY ? "READY" : "WAIT", bt.state == BT_READY ? TE_COL[1] : C_HI);
-        }
-        str_cpy(b, "PLAYERS ", sizeof b);
-        fmt_int(b + str_len(b), btr.lobby_n);
-        str_cpy(b + str_len(b), "  READY ", sizeof b - str_len(b));
-        fmt_int(b + str_len(b), btr.lobby_ready);
-        bt_line(146, &FONT_S, b, C_AMB);
-        bt_line(176, &FONT_S, bt.state == BT_READY ? "SOUNDS ON START" : "PRESS READY ON THE SITE", C_GRAY);
-        bt_line(214, &FONT_S, btr.quitting ? "HOLD TO LEAVE..." : "REC+PLAY HELD: LEAVE", C_DIM);
+        bt_paint(btr.cd_end ? bt_countdown : bt_lobby);
         break;
     case BS_CONFIRM:
         bt_line(40, &FONT_S, "SUBMIT YOUR BEAT?", C_WHITE);
@@ -182,4 +306,14 @@ UI_SMALL static int32_t battle_head(int32_t x)
     uint32_t left = bt_left();
     bt_mmss(b, left);
     return cv_text(x + 12, 1, &FONT_S, b, left < 60000u ? TE_RED : TE_COL[2]);
+}
+UI_SMALL static int32_t battle_head_r(int32_t xr, int32_t y)   /* the live screens' header (ui_studio.c te_header) */
+{
+    char b[12];
+    uint32_t left = bt_left();
+    int32_t x;
+    bt_mmss(b, left);
+    x = xr - text_w(&FONT_S, b);
+    cv_text(x, y, &FONT_S, b, left < 60000u ? TE_RED : TE_COL[2]);
+    return x;
 }

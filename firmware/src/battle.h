@@ -29,6 +29,7 @@ static int battle_input(uint32_t pressed, uint32_t notes);   /* 1: a battle scre
 static int battle_draw(void);             /* 1: a battle screen is drawn instead of the page */
 static uint32_t battle_head_sig(void);
 static int32_t battle_head(int32_t x);    /* the battle clock in the top bar from x; the next x */
+static int32_t battle_head_r(int32_t xr, int32_t y);   /* the clock in the live screens' header, ending at xr; its x */
 static void battle_play_down(void);       /* PLAY pressed (ui_input.c) */
 static int battle_editor(uint32_t cmd, const uint8_t *a, uint32_t na);   /* editor.c: 1 = handled, reply built */
 static void battle_info_tag(void);        /* editor.c INFO: the battle tag */
@@ -47,6 +48,7 @@ static void battle_info_tag(void);        /* editor.c INFO: the battle tag */
 #define battle_draw() 0
 #define battle_head_sig() 0u
 #define battle_head(x) (x)
+#define battle_head_r(xr, y) ((void)(y), (xr))
 #define battle_play_down() ((void)0)
 #define battle_editor(c, a, n) ((void)(c), (void)(a), (void)(n), 0)
 #define battle_info_tag() ((void)0)

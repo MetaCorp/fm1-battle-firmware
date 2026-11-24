@@ -55,8 +55,11 @@ int main(int argc, char **argv)
     bt.state = BT_READY;
     btr.lobby_ready = 3;
     shot("battle-2-ready");
-    btr.cd_end = fm1_ms + 12000u;
+    btr.cd_s = 15;                               /* the 15 s countdown, 12 s left, then the last 3 */
+    btr.cd_end = fm1_ms + 11500u;
     shot("battle-3-countdown");
+    btr.cd_end = fm1_ms + 2400u;
+    shot("battle-3b-countdown-end");
     btr.cd_end = 0;
 
     /* the production: SLOOP's pages, the clock in the top bar */

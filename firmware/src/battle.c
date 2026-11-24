@@ -75,6 +75,7 @@ static struct {
     uint32_t push_ms, hold_t0, quit_t0, save_ms, check_ms, link_ms, cd_end, proj_sum, scr_sig;
     uint16_t lobby_bpm;
     uint8_t loaded, confirm, holding, quitting, lobby_n, lobby_ready, scr;
+    uint8_t cd_s;                                /* the countdown's length in s (the longest heard since it began) */
     uint8_t bank[3];                             /* the pack's sounds as BANK entries (ui.c): the PRESETS list */
     int8_t ptch_id;                              /* FM6's PTCH parameter (P_E0 + k), -1 none */
     char genre[13], title[21], link[17];
@@ -503,6 +504,8 @@ UI_SMALL static void bt_cmd(uint32_t cmd, const uint8_t *a, uint32_t na)
         }
         btr.lobby_n = a[0];
         btr.lobby_ready = a[1];
+        if (a[2] < 127u && (!btr.cd_end || a[2] > btr.cd_s))   /* a new countdown, or a longer one */
+            btr.cd_s = a[2];
         btr.cd_end = a[2] < 127u ? fm1_ms + a[2] * 1000u : 0u;
         btr.lobby_bpm = (uint16_t)clamp(ed_rv(a + 3), 0, 999);
         i = 5u + bt_rstr(a + 5, na - 5u, btr.genre, sizeof btr.genre);

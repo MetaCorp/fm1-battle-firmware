@@ -182,11 +182,13 @@ UI_SMALL static void te_header(const char *title, uint16_t tc, uint32_t *cache, 
 {
     char b[12];
     uint32_t beat = clk_beat, k, playing = song.playing;
+    int32_t rx;                                        /* BATTLE: the right edge left by the clock */
     uint32_t sig = studio_hash((uint32_t)song.g[G_BPM] * 7u + playing * 3u + (song.rec != 0) * 1999u +
                                (playing ? beat * 131u + TSEL->seq_idx * 7919u : 0u) + (uint32_t)song.g[G_CLOCK] * 77u +
                                arrangement_enabled * 5u + (ui.bpm_t != 0) * 104729u + song.solo * 37u, title);
     sig = sig * 31u + tc;
     sig = sig * 31u + (uint32_t)(sect + 1) * 211u;    /* (2.7.2) the section A..D badge */
+    sig = sig * 31u + battle_head_sig();               /* BATTLE: the clock */
     if (!ui.force && sig == *cache)
         return;
     *cache = sig;
@@ -203,11 +205,12 @@ UI_SMALL static void te_header(const char *title, uint16_t tc, uint32_t *cache, 
     }
     for (k = 0; k < 4u; k++)                           /* the four beats of the bar */
         cv_rect(104 + (int32_t)k * 9, 26, 7, 7, playing && beat % 4u == k ? (k ? C_WHITE : TE_RED) : TE_G2);
+    rx = battle_locked() ? battle_head_r(236, 22) - 8 : 236;   /* BATTLE: the time left, bottom right */
     if (song.rec) {
         te_disc(224, 12, 8, TE_RED);
         cv_text(176, 4, &FONT_S, "rec", TE_RED);
         if (song.g[G_CLOCK] != 0)                       /* the click is on */
-            cv_text(168, 22, &FONT_S, "click", TE_G3);
+            cv_text(rx == 236 ? 168 : rx - text_w(&FONT_S, "click"), 22, &FONT_S, "click", TE_G3);   /* BATTLE: x */
     } else {
         int32_t tx = 240 - text_w(&FONT_S, title) - 4;
         cv_text(tx, 5, &FONT_S, title, tc);
@@ -218,7 +221,7 @@ UI_SMALL static void te_header(const char *title, uint16_t tc, uint32_t *cache, 
             cv_text(bx + 4, 5, &FONT_S, sb, C_BLACK);
         }
         if (song.solo)
-            cv_text(236 - text_w(&FONT_S, "solo"), 22, &FONT_S, "solo", C_WHITE);
+            cv_text(rx - text_w(&FONT_S, "solo"), 22, &FONT_S, "solo", C_WHITE);   /* BATTLE: rx (236) */
     }
     cv_rect(0, 39, 240, 1, TE_G1);
     cv_blit(0, 0);
